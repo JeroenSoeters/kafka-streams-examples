@@ -76,7 +76,8 @@ public abstract class KafkaIntegrationTest {
     }
 
     protected static <K, V> void produceMessagesToTopic(
-            String topic, List<KeyValue<K, V>> messages,
+            String topic,
+            List<KeyValue<K, V>> messages,
             String keySerializer,
             String valueSerializer) throws ExecutionException, InterruptedException {
 

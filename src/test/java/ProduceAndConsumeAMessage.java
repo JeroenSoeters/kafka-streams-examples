@@ -14,7 +14,7 @@ import java.util.concurrent.ExecutionException;
 public class ProduceAndConsumeAMessage extends KafkaIntegrationTest {
 
     @Test
-    public void testKafkaProducerAndConsumer() throws InterruptedException, ExecutionException {
+    public void shouldProduceAndComsumeMessages() throws InterruptedException, ExecutionException {
         List<KeyValue<String, TestMessage>> expectedMessageList = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             expectedMessageList.add(new KeyValue<>("key" + i, new TestMessage("test-message" + i)));
