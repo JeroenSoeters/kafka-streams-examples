@@ -1,6 +1,11 @@
 package helpers;
 
+import kafka.admin.AdminUtils;
+import kafka.admin.RackAwareMode;
+import kafka.utils.ZkUtils;
 import localcluster.KafkaLocalServer;
+import org.I0Itec.zkclient.ZkClient;
+import org.I0Itec.zkclient.ZkConnection;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -9,12 +14,14 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import scala.Tuple2;
 
-import java.security.Key;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 public abstract class KafkaIntegrationTest {
@@ -37,6 +44,8 @@ public abstract class KafkaIntegrationTest {
         Properties zkProperties;
 
         try {
+            purgeLocalState();
+
             //load properties
             kafkaProperties = getKafkaProperties(DEFAULT_KAFKA_LOG_DIR, BROKER_PORT, BROKER_ID);
             zkProperties = getZookeeperProperties(ZOOKEEPER_PORT, DEFAULT_ZOOKEEPER_LOG_DIR);
@@ -63,10 +72,14 @@ public abstract class KafkaIntegrationTest {
         consumer.subscribe(Arrays.asList(topic));
 
         long start = System.currentTimeMillis();
-        while (result.size() < expectedMessageCount && start - System.currentTimeMillis() < timeoutInMillis) {
+        while (result.size() < expectedMessageCount && System.currentTimeMillis() - start < timeoutInMillis) {
+            System.out.print("polling for new messages, timing out after " + (start - System.currentTimeMillis()) + " millis...");
+
             ConsumerRecords<K, V> records = consumer.poll(1000);
             for (ConsumerRecord<K, V> record : records) {
                 result.add(new KeyValue<>(record.key(), record.value()));
+
+                System.out.println("message consumed " + record.value());
             }
         }
 
@@ -88,9 +101,28 @@ public abstract class KafkaIntegrationTest {
                     new ProducerRecord<>(topic, message.getKey(), message.getValue());
             // Produce message synchronously
             producer.send(data).get();
+
+            System.out.println("message produced: " + message.getValue());
         }
 
         producer.close();
+    }
+
+    protected static void createTopic(String topic) {
+        int sessionTimeoutMs = 10000;
+        int connectionTimeoutMs = 10000;
+        Tuple2<ZkClient, ZkConnection> zkClientAndConnection = ZkUtils.createZkClientAndConnection(
+                "localhost:2000", sessionTimeoutMs, connectionTimeoutMs);
+
+
+        ZkUtils zkUtils = new ZkUtils(zkClientAndConnection._1(), zkClientAndConnection._2(), false);
+        int numPartitions = 1;
+        int replicationFactor = 1;
+        Properties topicConfig = new Properties();
+
+        AdminUtils.createTopic(zkUtils, topic, numPartitions, replicationFactor, topicConfig, RackAwareMode.Disabled$.MODULE$);
+
+        System.out.println("Topic " + topic + " created.");
     }
 
     private static <K, V> KafkaProducer<K, V> newKafkaProducer(String keySerializer, String valueSerializer) {
@@ -134,5 +166,23 @@ public abstract class KafkaIntegrationTest {
         properties.put("clientPort", port + "");
         properties.put("dataDir", zookeeperDir);
         return properties;
+    }
+
+    private static void purgeLocalState() {
+        deleteDirectory(DEFAULT_KAFKA_LOG_DIR);
+        deleteDirectory(DEFAULT_ZOOKEEPER_LOG_DIR);
+    }
+
+    private static void deleteDirectory(String path) {
+        try {
+            Path rootPath = Paths.get(path);
+            Files.walk(rootPath)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .peek(System.out::println)
+                    .forEach(File::delete);
+        } catch (IOException e) {
+            // ignore, path didn't exist
+        }
     }
 }

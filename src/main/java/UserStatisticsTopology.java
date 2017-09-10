@@ -3,6 +3,7 @@ import messages.UserStats;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.*;
 import serialization.JsonDeserializer;
@@ -50,12 +51,29 @@ public class UserStatisticsTopology {
                     (s, event, stats) -> stats.processEvent(event),
                     (k, s1, s2) -> s1.combine(s2),
                     SessionWindows.with(TimeUnit.SECONDS.toMillis(30)).until(TimeUnit.HOURS.toMillis(1)),
-                    new UserStatsSerde());
+                    new UserStatsSerde(),
+                    "user-stats-store");
 
         userStats
-            .toStream((window, stats) -> stats.setWindowInformation(window.window().start(), window.window().end()))
-            .selectKey((wKey, stats) -> stats.getUserId())
-            .to(Serdes.String(), new UserStatsSerde(), Topics.USER_STATISTICS);
+           .toStream()
+           .filter((window, state) -> state != null)
+           .map((window, state) -> new KeyValue<>(window, state.setWindowInformation(window.window().start(), window.window().end())))
+           .selectKey((window, stats) -> stats.getUserId())
+           .to(Serdes.String(), new UserStatsSerde(), Topics.USER_STATISTICS);
+
+//            .filterNot((window, stats) -> stats == null)
+//            .toStream((window, stats) -> {
+//                System.out.println("window is null? " + (window == null));
+//                System.out.println("stats is null? " + (stats == null));
+//                if (stats == null) {
+//                    return stats;
+//                } else {
+//                    return stats.setWindowInformation(window.window().start(), window.window().end());
+//                }
+//
+//            })
+//            .selectKey((wKey, stats) -> stats.getUserId())
+//            .to(Serdes.String(), new UserStatsSerde(), Topics.USER_STATISTICS);
 
         return new KafkaStreams(builder, props);
     }

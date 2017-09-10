@@ -22,18 +22,21 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
 
     @Test
     public void shouldGenerateUserStatistics() {
+        createTopic(Topics.EVENT);
+        createTopic(Topics.USER_STATISTICS);
+
         Instant userOneSessionStart = Instant.now();
         Instant userTwoSessionStart = Instant.now();
 
         List<Event> userEvents = Arrays.asList(
             new Event(userOneSessionStart.toEpochMilli(), "1", "message_sent", 1, 1),
-            new Event(userOneSessionStart.plus(5, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 2, 2),
-            new Event(userOneSessionStart.plus(29, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 3),
-            new Event(userOneSessionStart.plus(31, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 4),
+            new Event(userOneSessionStart.plus(1, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 2, 2),
+            new Event(userOneSessionStart.plus(2, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 3),
+            new Event(userOneSessionStart.plus(6, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 4),
 
-            new Event(userTwoSessionStart.toEpochMilli(), "1", "message_sent", 1, 5),
-            new Event(userTwoSessionStart.plus(5, ChronoUnit.SECONDS).toEpochMilli(), "2", "message_sent", 2, 6),
-            new Event(userTwoSessionStart.plus(10, ChronoUnit.SECONDS).toEpochMilli(), "2", "message_sent", 2, 7)
+            new Event(userTwoSessionStart.toEpochMilli(), "2", "message_sent", 1, 5),
+            new Event(userTwoSessionStart.plus(1, ChronoUnit.SECONDS).toEpochMilli(), "2", "message_sent", 2, 6),
+            new Event(userTwoSessionStart.plus(1, ChronoUnit.SECONDS).toEpochMilli(), "2", "message_sent", 2, 7)
         );
 
         Map<Integer, Integer> userOneExpectedMessageCounts = new HashMap<>();
@@ -60,6 +63,7 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
         try {
             // Start KStreams
             KafkaStreams streams = UserStatisticsTopology.userStatistics();
+            streams.cleanUp();
             streams.start();
 
             Thread.sleep(5000);
@@ -68,7 +72,7 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
 
             produceMessagesToTopic(
                     Topics.EVENT,
-                    userEvents.stream().map(e -> new KeyValue<>("", e)).collect(Collectors.toList()),
+                    userEvents.stream().map(e -> new KeyValue<>(e.getUserId(), e)).collect(Collectors.toList()),
                     new StringSerializer().getClass().getName(),
                     "serialization.EventSerializer");
 
@@ -79,7 +83,7 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
                     new StringDeserializer().getClass().getName(),
                     "serialization.UserStatsDeserializer",
                     2,
-                    35000);
+                    10000);
 
             streams.close();
 
