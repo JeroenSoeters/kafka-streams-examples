@@ -50,7 +50,7 @@ public class UserStatisticsTopology {
                     UserStats::new,
                     (s, event, stats) -> stats.processEvent(event),
                     (k, s1, s2) -> s1.combine(s2),
-                    SessionWindows.with(TimeUnit.SECONDS.toMillis(30)).until(TimeUnit.HOURS.toMillis(1)),
+                    SessionWindows.with(TimeUnit.SECONDS.toMillis(5)).until(TimeUnit.HOURS.toMillis(1)),
                     new UserStatsSerde(),
                     "user-stats-store");
 
@@ -60,20 +60,6 @@ public class UserStatisticsTopology {
            .map((window, state) -> new KeyValue<>(window, state.setWindowInformation(window.window().start(), window.window().end())))
            .selectKey((window, stats) -> stats.getUserId())
            .to(Serdes.String(), new UserStatsSerde(), Topics.USER_STATISTICS);
-
-//            .filterNot((window, stats) -> stats == null)
-//            .toStream((window, stats) -> {
-//                System.out.println("window is null? " + (window == null));
-//                System.out.println("stats is null? " + (stats == null));
-//                if (stats == null) {
-//                    return stats;
-//                } else {
-//                    return stats.setWindowInformation(window.window().start(), window.window().end());
-//                }
-//
-//            })
-//            .selectKey((wKey, stats) -> stats.getUserId())
-//            .to(Serdes.String(), new UserStatsSerde(), Topics.USER_STATISTICS);
 
         return new KafkaStreams(builder, props);
     }

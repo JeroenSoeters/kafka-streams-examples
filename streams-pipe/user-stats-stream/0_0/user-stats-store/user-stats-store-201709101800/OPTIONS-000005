@@ -25,7 +25,7 @@
   writable_file_max_buffer_size=1048576
   WAL_size_limit_MB=0
   max_subcompactions=1
-  wal_dir=/Users/jeroensoeters/dev/kafka-streams-examples/streams-pipe/user-stats-stream/0_0/user-stats-store/user-stats-store-201709101730
+  wal_dir=/Users/jeroensoeters/dev/kafka-streams-examples/streams-pipe/user-stats-stream/0_0/user-stats-store/user-stats-store-201709101800
   wal_bytes_per_sync=0
   max_total_wal_size=0
   db_write_buffer_size=0

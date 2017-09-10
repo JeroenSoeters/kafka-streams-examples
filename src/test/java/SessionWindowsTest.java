@@ -2,20 +2,15 @@ import helpers.KafkaIntegrationTest;
 import helpers.KeyValue;
 import messages.Event;
 import messages.UserStats;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class SessionWindowsTest extends KafkaIntegrationTest {
@@ -32,7 +27,7 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
             new Event(userOneSessionStart.toEpochMilli(), "1", "message_sent", 1, 1),
             new Event(userOneSessionStart.plus(1, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 2, 2),
             new Event(userOneSessionStart.plus(2, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 3),
-            new Event(userOneSessionStart.plus(6, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 4),
+            new Event(userOneSessionStart.plus(4, ChronoUnit.SECONDS).toEpochMilli(), "1", "message_sent", 1, 4),
 
             new Event(userTwoSessionStart.toEpochMilli(), "2", "message_sent", 1, 5),
             new Event(userTwoSessionStart.plus(1, ChronoUnit.SECONDS).toEpochMilli(), "2", "message_sent", 2, 6),
@@ -77,13 +72,16 @@ public class SessionWindowsTest extends KafkaIntegrationTest {
                     "serialization.EventSerializer");
 
             // Consume user statistics
-            List<KeyValue<String, Event>> actualUserStatistics =
+            List<KeyValue<String, UserStats>> allUserStats =
                consumeMessagesFromTopic(
                     Topics.USER_STATISTICS,
                     new StringDeserializer().getClass().getName(),
                     "serialization.UserStatsDeserializer",
                     2,
                     10000);
+            Map<String, UserStats> statsPerUser = new HashMap<>();
+            allUserStats.forEach((kv) -> statsPerUser.put(kv.getKey(), kv.getValue()));
+            List<UserStats> actualUserStatistics = new ArrayList(statsPerUser.values());
 
             streams.close();
 
